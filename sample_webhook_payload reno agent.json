@@ -1,0 +1,12 @@
+{
+  "_note": "This is the JSON body to POST to the workflow's Webhook Test URL to trigger a run using postman. Fire two separate versions of this — one with scenario_type 'renovation' and one with 'vacating' — to demonstrate both branches.",
+
+  "scenario_renovation_example": {
+  "scenario_type": "renovation",
+  "image_url": "https://raw.githubusercontent.com/Fazil-24/RenoAgent/main/data/sample1.png",
+  "area_sqft": 45,
+  "location_area": "Bur Dubai",
+  "user_email": "mfazil2409@gmail.com",
+  "user_name": "Fazil"
+}
+}

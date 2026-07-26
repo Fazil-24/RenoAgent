@@ -1,0 +1,1599 @@
+{
+  "name": "Reno Quote Audit Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "maxResults": 50,
+        "filters": {
+          "q": "subject:RFQ- has:attachment"
+        },
+        "options": {
+          "downloadAttachments": true
+        }
+      },
+      "id": "59c76912-8799-42eb-9e4b-a8878b32fe6e",
+      "name": "Vendor Reply Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "0kMuxPnkopw9rbv0",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "={{ Object.keys($binary)[0] }}",
+        "options": {}
+      },
+      "id": "60a1e0ce-e5d5-47fd-88c6-38b6d2dc2021",
+      "name": "Extract PDF Text",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.cerebras.ai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: \"gpt-oss-120b\",\n  messages: [\n    {\n      role: \"user\",\n      content: \"Extract vendor quote details from this quotation text. Return ONLY valid JSON, no extra text, in this exact shape: {\\\"vendor_name\\\":\\\"\\\",\\\"reference_code\\\":\\\"\\\",\\\"total_price_aed\\\":0,\\\"deposit_requested_percent\\\":0,\\\"estimated_days\\\":0,\\\"line_items\\\":[{\\\"item\\\":\\\"\\\",\\\"cost_aed\\\":0}]}. Text: \" + $json.text\n    }\n  ]\n}) }}",
+        "options": {}
+      },
+      "id": "64213a96-e1ef-4f0b-8103-e0494d0f2d2a",
+      "name": "Parse Quote PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        448,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ZvXO28CiKuTIRxqH",
+          "name": "Cerebras API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawContent = $input.item.json.choices[0].message.content;\nconst cleaned = rawContent.replace(/```json\\s*|```/g, '').trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  parsed = {\n    vendor_name: \"unknown\",\n    reference_code: \"unknown\",\n    total_price_aed: 0,\n    deposit_requested_percent: 0,\n    estimated_days: 0,\n    line_items: []\n  };\n}\n\nreturn { json: parsed };"
+      },
+      "id": "6efb0cff-79da-4669-9125-b2eb31ef2681",
+      "name": "Parse Quote JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1e9y8Dx9YHg8UnGHRhaxbZVK5QkdZcvCEan8YWg5hQfg",
+          "mode": "list",
+          "cachedResultName": "reno_data",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e9y8Dx9YHg8UnGHRhaxbZVK5QkdZcvCEan8YWg5hQfg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2021844047,
+          "mode": "list",
+          "cachedResultName": "ReceivedQuotes",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e9y8Dx9YHg8UnGHRhaxbZVK5QkdZcvCEan8YWg5hQfg/edit#gid=2021844047"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "reference_code": "={{ $json.reference_code }}",
+            "vendor_name": "={{ $json.vendor_name }}",
+            "total_price_aed": "={{ $json.total_price_aed }}",
+            "deposit_requested_percent": "={{ $json.deposit_requested_percent }}",
+            "estimated_days": "={{ $json.estimated_days }}",
+            "line_items_json": "={{ JSON.stringify($json.line_items) }}",
+            "received_at": "={{ $now.toISO() }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "reference_code",
+              "displayName": "reference_code",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "vendor_name",
+              "displayName": "vendor_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "total_price_aed",
+              "displayName": "total_price_aed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "deposit_requested_percent",
+              "displayName": "deposit_requested_percent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estimated_days",
+              "displayName": "estimated_days",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "line_items_json",
+              "displayName": "line_items_json",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "received_at",
+              "displayName": "received_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "e0e56986-7e76-4039-a4de-aa6fcf5580d2",
+      "name": "Log Received Quote",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        896,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1NI8gHFkgSLiRosq",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "2e7eb05d-d5f5-4485-b743-8917bb42ed57",
+        "options": {}
+      },
+      "id": "b9339c50-f00c-445c-bfcd-b33e8df813dc",
+      "name": "RFQ Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        368
+      ],
+      "webhookId": "2e7eb05d-d5f5-4485-b743-8917bb42ed57"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1e9y8Dx9YHg8UnGHRhaxbZVK5QkdZcvCEan8YWg5hQfg",
+          "mode": "list",
+          "cachedResultName": "reno_data",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e9y8Dx9YHg8UnGHRhaxbZVK5QkdZcvCEan8YWg5hQfg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1892718915,
+          "mode": "list",
+          "cachedResultName": "VisionQuota",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e9y8Dx9YHg8UnGHRhaxbZVK5QkdZcvCEan8YWg5hQfg/edit#gid=1892718915"
+        },
+        "options": {}
+      },
+      "id": "2e2f2085-c874-4a9f-ade4-e0c4e1be4665",
+      "name": "Get Data",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        368
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1NI8gHFkgSLiRosq",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "2b67f2b1-acd2-43b7-97e8-b68596791d24",
+              "leftValue": "={{ $json.count }}",
+              "rightValue": "={{ $json.daily_limit }}",
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4e020c08-6464-49f4-83fd-4e0b78925cec",
+      "name": "vision quota",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('RFQ Trigger').item.json.body.image_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "dfb3cc23-58e6-41d3-8203-6fb0836938b3",
+      "name": "Download Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        672,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const buffer = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst mimeType = $input.item.binary.data.mimeType || 'image/png';\nconst base64 = buffer.toString('base64');\n\nreturn {\n  json: {\n    ...$input.item.json,\n    image_data_uri: `data:${mimeType};base64,${base64}`\n  }\n};"
+      },
+      "id": "f6b77806-0dfe-4af1-ac40-05a665c721d4",
+      "name": "Convert to Base64",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.cerebras.ai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gemma-4-31b\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": [\n        { \"type\": \"text\", \"text\": \"Analyse this image of a home/property issue. List each distinct visible issue (max 4) - e.g. peeling paint, water stain, cracked tile, broken fixture or light or switches. Also don't hallucinate; clearly understand and analyze the image and then come to a conclusion. For each: description (short phrase), severity (low/medium/high), trade_category (plumbing, tiling, electrical, carpentry, painting, general). Also give overall_severity (the highest severity found) and overall_trade_category (the primary trade needed). Respond ONLY in this exact JSON shape, no extra text: {\\\"issues\\\":[{\\\"description\\\":\\\"\\\",\\\"severity\\\":\\\"\\\",\\\"trade_category\\\":\\\"\\\"}],\\\"overall_severity\\\":\\\"\\\",\\\"overall_trade_category\\\":\\\"\\\"}\" },\n        { \"type\": \"image_url\", \"image_url\": { \"url\": \"{{ $json.image_data_uri }}\" } }\n      ]\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "47977aee-c9af-4744-b3bd-106655af2dbd",
+      "name": "Vision Analysis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1120,
+        368
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ZvXO28CiKuTIRxqH",
+          "name": "Cerebras API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawContent = $input.item.json.choices[0].message.content;\nconst cleaned = rawContent.replace(/```json\\s*|```/g, '').trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  parsed = {\n    issues: [{ description: \"Unable to analyze\", severity: \"unknown\", trade_category: \"general\" }],\n    overall_severity: \"unknown\",\n    overall_trade_category: \"general\"\n  };\n}\n\nreturn {\n  json: {\n    ...$('RFQ Trigger').item.json.body,\n    issues: parsed.issues,\n    severity: parsed.overall_severity,\n    trade_category: parsed.overall_trade_category\n  }\n};"
+      },
+      "id": "3a45ae7d-bff1-49b8-9a15-be24ffefd2f8",
+      "name": "Parse Vision Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  json: $input.item.json,\n  binary: $('Download Image').item.binary\n};"
+      },
+      "id": "dd3e6d91-065e-4d3b-8075-91eedadab08a",
+      "name": "Reattach Image Binary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1e9y8Dx9YHg8UnGHRhaxbZVK5QkdZcvCEan8YWg5hQfg",
+          "mode": "list",
+          "cachedResultName": "reno_data",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e9y8Dx9YHg8UnGHRhaxbZVK5QkdZcvCEan8YWg5hQfg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "VendorsMock",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e9y8Dx9YHg8UnGHRhaxbZVK5QkdZcvCEan8YWg5hQfg/edit#gid=0"
+        },
+        "options": {}
+      },
+      "id": "4207a2d1-f890-43cb-8d06-82513b9e4e4e",
+      "name": "Get Vendors",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1856,
+        368
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1NI8gHFkgSLiRosq",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  json: $input.item.json,\n  binary: $('Reattach Image Binary').item.binary\n};"
+      },
+      "id": "d4519d8c-f6ff-4644-9a42-7deaf38e595b",
+      "name": "Attach Image To Item",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2528,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "=RFQ-{{ $now.format('X') }} - {{ $('Parse Vision Output').item.json.trade_category }} work needed",
+        "message": "=<p>Hi {{ $json.name }},</p>\n\n<p>We have a <b>{{ $('Reattach Image Binary').item.json.severity }} severity</b> issue at <b>{{ $('Reattach Image Binary').item.json.location_area }}</b> (~{{ $('Reattach Image Binary').item.json.area_sqft }} sqft).</p>\n\n<p><b>Issues identified:</b></p>\n<ul>\n{{ $('Reattach Image Binary').item.json.issues.map(i => `<li>${i.description} (${i.severity}, ${i.trade_category})</li>`).join('') }}\n</ul>\n\n<p>Photo attached. Could you send a quote?</p>\n<p><i>Reference: RFQ-{{ $now.format('X') }}</i></p>",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {}
+            ]
+          }
+        }
+      },
+      "id": "ae3bcb75-1695-4f72-a4a5-2d3bc2358ea6",
+      "name": "Send RFQ",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2768,
+        480
+      ],
+      "webhookId": "b4548918-59fb-4674-a1d6-8dce776a70b2",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "0kMuxPnkopw9rbv0",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "9a94ea62-a980-468e-8dd3-f87b578eda76",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "69a1f988-9b3b-4fea-8022-1fa908b1434d",
+      "name": "Check Send Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3008,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "7039066b-9bde-4c32-99d0-0d1aa968d45e",
+      "name": "Loop Vendors",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        2304,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1e9y8Dx9YHg8UnGHRhaxbZVK5QkdZcvCEan8YWg5hQfg",
+          "mode": "list",
+          "cachedResultName": "reno_data",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e9y8Dx9YHg8UnGHRhaxbZVK5QkdZcvCEan8YWg5hQfg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1354667138,
+          "mode": "list",
+          "cachedResultName": "FailedSends",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e9y8Dx9YHg8UnGHRhaxbZVK5QkdZcvCEan8YWg5hQfg/edit#gid=1354667138"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "vendor_name": "={{ $json.name }}",
+            "email": "={{ $json.email }}",
+            "error_reason": "={{ $json.error }}",
+            "timestamp": "={{ $json.timestamp }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "vendor_name",
+              "displayName": "vendor_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "error_reason",
+              "displayName": "error_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "bb6a7f99-b67e-49f5-b132-64f0fa3fbb51",
+      "name": "Log Failed Vendor",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3216,
+        480
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1NI8gHFkgSLiRosq",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://serpapi.com/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $('Parse Vision Output').item.json.trade_category }} renovation cost per sqft Dubai"
+            },
+            {
+              "name": "engine",
+              "value": "google"
+            },
+            {
+              "name": "api_key",
+              "value": "************************************************"
+            },
+            {
+              "name": "num",
+              "value": "10"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2528,
+        304
+      ],
+      "id": "e2e4f784-d6de-4e08-933f-9aaafbbd5628",
+      "name": "Price Reference Search"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.cerebras.ai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: \"gpt-oss-120b\",\n  messages: [\n    {\n      role: \"user\",\n      content: \"From these search snippets, find any mentioned cost/price figures for renovation or contractor work per sqft or per unit in Dubai/UAE. Respond ONLY as JSON: {\\\"low_aed\\\":0,\\\"high_aed\\\":0,\\\"unit\\\":\\\"\\\",\\\"source_note\\\":\\\"\\\"}. If no clear figure is found, estimate a reasonable range based on similar UAE service pricing mentioned and note that in source_note. Snippets: \" + $json.combined_text\n    }\n  ]\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2944,
+        304
+      ],
+      "id": "dcf61935-aee3-47de-ae14-7b836afa15a3",
+      "name": "Extract Price Range",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ZvXO28CiKuTIRxqH",
+          "name": "Cerebras API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.item.json;\nconst snippets = [];\n\n// Pull short text snippets only, skip images/tokens/metadata\nif (data.related_questions) {\n  data.related_questions.forEach(q => {\n    if (q.snippet) snippets.push(q.snippet);\n  });\n}\nif (data.organic_results) {\n  data.organic_results.forEach(r => {\n    if (r.snippet) snippets.push(r.snippet);\n  });\n}\n\nreturn {\n  json: {\n    combined_text: snippets.join(' | ')\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2736,
+        304
+      ],
+      "id": "213ec652-75b4-47e6-9b92-3dff2483800b",
+      "name": "Clean Search Snippets"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawContent = $input.item.json.choices[0].message.content;\nconst cleaned = rawContent.replace(/```json\\s*|```/g, '').trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  parsed = { low_aed: 30, high_aed: 60, unit: \"sqft\", source_note: \"fallback default - parsing failed\" };\n}\n\nreturn { json: parsed };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3152,
+        304
+      ],
+      "id": "d7fbbaa4-1e18-4969-b60b-c6571ff4a117",
+      "name": "Parse Price Range"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1e9y8Dx9YHg8UnGHRhaxbZVK5QkdZcvCEan8YWg5hQfg",
+          "mode": "list",
+          "cachedResultName": "reno_data",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e9y8Dx9YHg8UnGHRhaxbZVK5QkdZcvCEan8YWg5hQfg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2021844047,
+          "mode": "list",
+          "cachedResultName": "ReceivedQuotes",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e9y8Dx9YHg8UnGHRhaxbZVK5QkdZcvCEan8YWg5hQfg/edit#gid=2021844047"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3440,
+        304
+      ],
+      "id": "456fc7b8-09e7-4ed5-9052-274f9a27c5c5",
+      "name": "Get Received Quotes",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1NI8gHFkgSLiRosq",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const priceRange = $('Parse Price Range').first().json;\nconst quotes = $input.all().map(item => item.json);\n\nconst VAGUE_KEYWORDS = ['miscellaneous', 'contingency', 'other', 'sundry', 'general'];\nconst DEPOSIT_RISK_THRESHOLD = 30; // percent\n\nconst auditedQuotes = quotes.map(q => {\n  let lineItems;\n  try {\n    lineItems = JSON.parse(q.line_items_json);\n  } catch (e) {\n    lineItems = [];\n  }\n\n  const flags = [];\n\n  // Flag 1: high deposit\n  const depositPct = Number(q.deposit_requested_percent);\n  if (depositPct > DEPOSIT_RISK_THRESHOLD) {\n    flags.push(`HIGH RISK: deposit of ${depositPct}% requested, above the ${DEPOSIT_RISK_THRESHOLD}% norm`);\n  }\n\n  // Flag 2: vague line items\n  lineItems.forEach(li => {\n    const itemLower = (li.item || '').toLowerCase();\n    if (VAGUE_KEYWORDS.some(kw => itemLower.includes(kw))) {\n      flags.push(`MEDIUM RISK: vague line item \"${li.item}\" (AED ${li.cost_aed}) lacks a clear breakdown`);\n    }\n  });\n\n  // Flag 3: total price sanity check vs reference range (using total as rough signal)\n  const total = Number(q.total_price_aed);\n  const impliedLow = priceRange.low_aed;\n  const impliedHigh = priceRange.high_aed;\n  // Simple total-based sanity note (not a strict per-sqft check, since job size varies)\n  let priceNote = 'within a reasonable range for the described scope';\n  if (total < impliedLow * 0.3) {\n    priceNote = 'notably low for the described scope - verify quality/material specification isn\\'t downgraded';\n    flags.push(`LOW-PRICE FLAG: total (AED ${total}) is well below typical reference pricing`);\n  }\n\n  const riskLevel = flags.some(f => f.startsWith('HIGH')) ? 'HIGH'\n    : flags.some(f => f.startsWith('MEDIUM') || f.startsWith('LOW-PRICE')) ? 'MEDIUM'\n    : 'LOW';\n\n  return {\n    vendor_name: q.vendor_name,\n    reference_code: q.reference_code,\n    total_price_aed: total,\n    deposit_requested_percent: depositPct,\n    estimated_days: q.estimated_days,\n    line_items: lineItems,\n    risk_level: riskLevel,\n    flags: flags.length ? flags : ['No issues detected - pricing and terms appear standard'],\n    price_note: priceNote\n  };\n});\n\nreturn auditedQuotes.map(q => ({ json: q }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3840,
+        320
+      ],
+      "id": "5f7f200c-a4a7-49c8-9f4e-e176b4ff7f27",
+      "name": "Audit Quotes"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are reviewing 3 audited vendor quotes for a home renovation job. Here is the data: {{ JSON.stringify($input.all().map(i => i.json)) }}\n\nRank the vendors from best to worst, weighing both total_price_aed and risk_level (a HIGH risk flag should weigh heavily against an otherwise-cheap price). Identify the top-ranked vendor. If the top vendor's total_price_aed exceeds 4000 AED, draft a brief, polite counter-offer message asking if they can match a target price of 4000 AED, citing that you have competitive quotes.\n\nRespond ONLY with valid JSON in this exact shape, no extra text or markdown formatting:\n{\n  \"ranking\": [{\"vendor_name\":\"\",\"total_price_aed\":0,\"risk_level\":\"\",\"reasoning\":\"\"}],\n  \"top_vendor_name\": \"\",\n  \"needs_counter_offer\": true,\n  \"counter_offer_subject\": \"\",\n  \"counter_offer_body\": \"\"\n}",
+        "options": {
+          "systemMessage": "You are a helpful assistant that evaluates contractor quotes and identifies the best value while accounting for risk."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        4000,
+        384
+      ],
+      "id": "ce16ff7c-bd4d-40c7-bc65-68662e031f7b",
+      "name": "Vendor Negotiation Agent",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawContent = $input.first().json.output;\nconst cleaned = rawContent.replace(/```json\\s*|```/g, '').trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  parsed = { ranking: [], top_vendor_name: \"unknown\", needs_counter_offer: false, counter_offer_subject: \"\", counter_offer_body: \"\" };\n}\n\nreturn [{ json: parsed }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4336,
+        304
+      ],
+      "id": "bfb271c0-5764-47d5-a26d-059eca1016f4",
+      "name": "Parse Agent Decision"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1e9y8Dx9YHg8UnGHRhaxbZVK5QkdZcvCEan8YWg5hQfg",
+          "mode": "list",
+          "cachedResultName": "reno_data",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e9y8Dx9YHg8UnGHRhaxbZVK5QkdZcvCEan8YWg5hQfg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "VendorsMock",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e9y8Dx9YHg8UnGHRhaxbZVK5QkdZcvCEan8YWg5hQfg/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        4544,
+        304
+      ],
+      "id": "72bdfcc0-5c76-4573-854b-5f08689250a9",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1NI8gHFkgSLiRosq",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const decision = $('Parse Agent Decision').first().json;\nconst vendors = $input.all().map(i => i.json);\n\nconst match = vendors.find(v =>\n  v.name.toLowerCase().includes(decision.top_vendor_name.toLowerCase()) ||\n  decision.top_vendor_name.toLowerCase().includes(v.name.toLowerCase())\n);\n\nlet cleanedBody = decision.counter_offer_body || '';\ncleanedBody = cleanedBody\n  .replace(/\\[Your Name\\]/gi, 'Fazil')\n  .replace(/\\[Your Contact Information\\]/gi, '')\n  .replace(/\\[Your Position.*?\\]/gi, '')\n  .replace(/\\[Contact Information\\]/gi, '')\n  .replace(/\\n{3,}/g, '\\n\\n'); // clean up any extra blank lines left behind\n\nreturn [{\n  json: {\n    ...decision,\n    top_vendor_email: match ? match.email : null,\n    counter_offer_body: cleanedBody\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4752,
+        304
+      ],
+      "id": "8467351d-8d66-4768-a919-755d7fb1999e",
+      "name": "Attach Vendor Email"
+    },
+    {
+      "parameters": {
+        "sendTo": "mfazil2409@gmail.com",
+        "subject": "Approval needed: vendor negotiation decision for RFQ",
+        "message": "=<p><b>Ranking summary:</b></p>\n<ul>\n{{ $json.ranking.map(r => `<li><b>${r.vendor_name}</b> - AED ${r.total_price_aed} (${r.risk_level} risk): ${r.reasoning}</li>`).join('') }}\n</ul>\n\n<p><b>Recommended vendor:</b> {{ $json.top_vendor_name }} ({{ $json.top_vendor_email }})</p>\n\n{{ $json.needs_counter_offer ? `<p><b>Drafted counter-offer:</b></p><p style=\"white-space: pre-line\">${$json.counter_offer_body}</p>` : '<p>No counter-offer needed - price is within target.</p>' }}\n\n<p>\n  <a href=\"{{ $execution.resumeUrl }}&action=approve\">✅ Approve & Send</a> &nbsp;|&nbsp;\n<a href=\"{{ $execution.resumeUrl }}&action=reject\">❌ Reject</a>\n</p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        4960,
+        304
+      ],
+      "id": "82425d9a-be7a-4d70-b191-af5ba29496f3",
+      "name": "Send HITL Approval Request",
+      "webhookId": "bd72f61e-e56c-4962-b05d-a52c97de8159",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "0kMuxPnkopw9rbv0",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        5152,
+        304
+      ],
+      "id": "175ca845-5df9-4370-9799-54754294691a",
+      "name": "Wait",
+      "webhookId": "d0a158f9-f52c-4b96-abc3-d29dfb7d2966"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "4e78b625-968e-4dae-988a-1a9aa75eac5b",
+              "leftValue": "={{ $json.query.action }}",
+              "rightValue": "approve",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        5344,
+        304
+      ],
+      "id": "5801ba3d-9ebc-4f16-bc95-3d79ed82559b",
+      "name": "Check Approval Decision"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1e9y8Dx9YHg8UnGHRhaxbZVK5QkdZcvCEan8YWg5hQfg",
+          "mode": "list",
+          "cachedResultName": "reno_data",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e9y8Dx9YHg8UnGHRhaxbZVK5QkdZcvCEan8YWg5hQfg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 348697673,
+          "mode": "list",
+          "cachedResultName": "Confirmations",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e9y8Dx9YHg8UnGHRhaxbZVK5QkdZcvCEan8YWg5hQfg/edit#gid=348697673"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "vendor_name": "={{ $('Attach Vendor Email').item.json.top_vendor_name }}",
+            "status": "rejected",
+            "timestamp": "={{ $now.toISO() }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "reference_code",
+              "displayName": "reference_code",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "vendor_name",
+              "displayName": "vendor_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "vendor_email",
+              "displayName": "vendor_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "final_price_aed",
+              "displayName": "final_price_aed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        5664,
+        416
+      ],
+      "id": "fe6697a1-7d50-4625-9ee6-2068c39df9ff",
+      "name": "Log Rejection",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1NI8gHFkgSLiRosq",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Attach Vendor Email').item.json.top_vendor_email }}",
+        "subject": "={{ $('Attach Vendor Email').item.json.counter_offer_subject }}",
+        "message": "={{ $('Attach Vendor Email').item.json.counter_offer_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        5664,
+        112
+      ],
+      "id": "727e7727-52bf-4b2a-8e40-9361003a5e65",
+      "name": "Send Vendor Counter-Offer",
+      "webhookId": "59838e45-f433-4182-a3f8-a0766f16ff77",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "0kMuxPnkopw9rbv0",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1e9y8Dx9YHg8UnGHRhaxbZVK5QkdZcvCEan8YWg5hQfg",
+          "mode": "list",
+          "cachedResultName": "reno_data",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e9y8Dx9YHg8UnGHRhaxbZVK5QkdZcvCEan8YWg5hQfg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 348697673,
+          "mode": "list",
+          "cachedResultName": "Confirmations",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e9y8Dx9YHg8UnGHRhaxbZVK5QkdZcvCEan8YWg5hQfg/edit#gid=348697673"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "reference_code": "={{ $('Parse Quote JSON').first().json.reference_code }}",
+            "vendor_name": "={{ $('Attach Vendor Email').item.json.top_vendor_name }}",
+            "vendor_email": "={{ $('Attach Vendor Email').item.json.top_vendor_email }}",
+            "status": "confirmed",
+            "final_price_aed": "={{ $('Attach Vendor Email').item.json.ranking[0].total_price_aed }}",
+            "timestamp": "={{ $now.toISO() }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "reference_code",
+              "displayName": "reference_code",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "vendor_name",
+              "displayName": "vendor_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "vendor_email",
+              "displayName": "vendor_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "final_price_aed",
+              "displayName": "final_price_aed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        5840,
+        112
+      ],
+      "id": "61c71d73-0187-4469-9a70-7773c1705341",
+      "name": "Log Confirmation",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1NI8gHFkgSLiRosq",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-oss-120b",
+          "mode": "list",
+          "cachedResultName": "gpt-oss-120b"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        3984,
+        624
+      ],
+      "id": "3a3fc181-dde3-494c-810d-6fc0ec9e83f7",
+      "name": "Custom LLM",
+      "credentials": {
+        "openAiApi": {
+          "id": "Q4jbTOs7r4A9H6og",
+          "name": "Cerebras (OpenAI-compatible)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0b1139f5-5adb-424b-9fbb-984ad72246ca",
+              "leftValue": "={{ $input.all().length }}",
+              "rightValue": 3,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3632,
+        304
+      ],
+      "id": "860df26a-4446-4aab-b5ce-22fb8d6c1806",
+      "name": "Check Quote Count"
+    },
+    {
+      "parameters": {
+        "amount": 60
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3824,
+        528
+      ],
+      "id": "131f1d43-c7f3-4409-aa00-12e1cc5bd441",
+      "name": "Wait For Replies",
+      "webhookId": "f551b9b0-de5a-48ae-b9c8-8f6c1f09dd59"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Vendor Reply Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract PDF Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract PDF Text": {
+      "main": [
+        [
+          {
+            "node": "Parse Quote PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Quote PDF": {
+      "main": [
+        [
+          {
+            "node": "Parse Quote JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Quote JSON": {
+      "main": [
+        [
+          {
+            "node": "Log Received Quote",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RFQ Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Data": {
+      "main": [
+        [
+          {
+            "node": "vision quota",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "vision quota": {
+      "main": [
+        [
+          {
+            "node": "Download Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Image": {
+      "main": [
+        [
+          {
+            "node": "Convert to Base64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to Base64": {
+      "main": [
+        [
+          {
+            "node": "Vision Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vision Analysis": {
+      "main": [
+        [
+          {
+            "node": "Parse Vision Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Vision Output": {
+      "main": [
+        [
+          {
+            "node": "Reattach Image Binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reattach Image Binary": {
+      "main": [
+        [
+          {
+            "node": "Get Vendors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Vendors": {
+      "main": [
+        [
+          {
+            "node": "Loop Vendors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach Image To Item": {
+      "main": [
+        [
+          {
+            "node": "Send RFQ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send RFQ": {
+      "main": [
+        [
+          {
+            "node": "Check Send Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Send Success": {
+      "main": [
+        [
+          {
+            "node": "Loop Vendors",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Failed Vendor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Vendors": {
+      "main": [
+        [
+          {
+            "node": "Price Reference Search",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Attach Image To Item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Failed Vendor": {
+      "main": [
+        [
+          {
+            "node": "Loop Vendors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Price Reference Search": {
+      "main": [
+        [
+          {
+            "node": "Clean Search Snippets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean Search Snippets": {
+      "main": [
+        [
+          {
+            "node": "Extract Price Range",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Price Range": {
+      "main": [
+        [
+          {
+            "node": "Parse Price Range",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Price Range": {
+      "main": [
+        [
+          {
+            "node": "Get Received Quotes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Received Quotes": {
+      "main": [
+        [
+          {
+            "node": "Check Quote Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Audit Quotes": {
+      "main": [
+        [
+          {
+            "node": "Vendor Negotiation Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vendor Negotiation Agent": {
+      "main": [
+        [
+          {
+            "node": "Parse Agent Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Agent Decision": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Attach Vendor Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach Vendor Email": {
+      "main": [
+        [
+          {
+            "node": "Send HITL Approval Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send HITL Approval Request": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Check Approval Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Approval Decision": {
+      "main": [
+        [
+          {
+            "node": "Send Vendor Counter-Offer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Rejection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Vendor Counter-Offer": {
+      "main": [
+        [
+          {
+            "node": "Log Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Custom LLM": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Vendor Negotiation Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Quote Count": {
+      "main": [
+        [
+          {
+            "node": "Audit Quotes",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait For Replies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For Replies": {
+      "main": [
+        [
+          {
+            "node": "Get Received Quotes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "a71ee3bf-4eba-41bf-8077-89cb369e54a1",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "6dd0d31875c6f9a9d872428417375418d8b760719a546e902eea94118de5a4bc"
+  },
+  "nodeGroups": [],
+  "id": "MPnkXMCd5gq9YUcC",
+  "tags": []
+}
